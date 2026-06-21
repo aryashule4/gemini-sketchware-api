@@ -1,1 +1,43 @@
+export async function onRequest(context) {
+  const { request, env } = context;
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Content-Type': 'text/plain; charset=utf-8'
+  };
+
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers });
+  }
+
+  if (request.method !== 'POST') {
+    return new Response('Kirim permintaan dengan metode POST.', { status: 400, headers });
+  }
+
+  try {
+    const promptText = await request.text();
+
+    if (!promptText || promptText.trim() === '') {
+      return new Response('Pertanyaan tidak boleh kosong.', { status: 400, headers });
+    }
+
+    const geminiUrl = `https://googleapis.com{env.GEMINI_API_KEY}`;
+
+    const response = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: promptText }] }]
+      })
+    });
+
+    const data = await response.json();
+    const textResponse = data.candidates[0].content.parts[0].text;
+
+    return new Response(textResponse, { status: 200, headers });
+  } catch (error) {
+    return new Response('Terjadi kesalahan server: ' + error.message, { status: 500, headers });
+  }
+}
 
