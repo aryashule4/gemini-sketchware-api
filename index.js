@@ -1,12 +1,16 @@
-import { GoogleGenAI } from '@google/genai';
-
 export default {
   async fetch(request, env) {
     const headers = {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
       'Content-Type': 'text/plain; charset=utf-8'
     };
+
+    // Menangani Preflight request dari browser/aplikasi jika ada
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers });
+    }
 
     if (request.method !== 'POST') {
       return new Response('Kirim permintaan dengan metode POST.', { status: 400, headers });
@@ -19,17 +23,27 @@ export default {
         return new Response('Pertanyaan tidak boleh kosong.', { status: 400, headers });
       }
 
-      const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+      // Menembak langsung ke Endpoint REST API resmi Google Gemini
+      const geminiUrl = `https://googleapis.com{env.GEMINI_API_KEY}`;
       
-      const response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
-        contents: promptText,
+      const response = await fetch(geminiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptText }] }]
+        })
       });
 
-      return new Response(response.text, { status: 200, headers });
+      const data = await response.json();
+      
+      // Mengambil teks jawaban bersih dari struktur JSON Gemini
+      const textResponse = data.candidates[0].content.parts[0].text;
+
+      return new Response(textResponse, { status: 200, headers });
     } catch (error) {
       return new Response('Terjadi kesalahan server: ' + error.message, { status: 500, headers });
     }
   }
 };
-
